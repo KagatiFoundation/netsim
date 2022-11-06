@@ -1,70 +1,10 @@
 #!/usr/bin/env python3
 
-import sys
-import pprint
-from enum import Enum
-
-class EthernetFrame:
-    IPV4 = 0x0800
-    ARP  = 0x0806
-
-    def __init__(self, src_mac: str, dest_mac: str, data, typ=None):
-        self.src_mac = src_mac
-        self.dest_mac = dest_mac
-        self.data = data
-        self.type = typ
-        self.preamble = 0
-        self.crc = 0
-
-
-class TransportLayerPacket:
-    UDP = 1
-    TCP = 2
-
-    def __init__(self, src_port, dest_port, data: bytes):
-        self.src_port = src_port
-        self.dest_port = dest_port
-        self.data = data
-
-
-class TCPPacket(TransportLayerPacket):
-    def __init__(self, src_port, dest_port, data: bytes):
-        super().__init__(src_port, dest_port, data)
-
-
-class UDPPacket(TransportLayerPacket):
-    def __init__(self, src_port, dest_port, data: bytes):
-        super().__init__(src_port, dest_port, data)
-        self.length = len(self)
-        self.checksum = 0b11111111
-
-    def __len__(self):
-        return 16 + len(self.data) # sizeof(source_port) + sizeof(dest_port) + sizeof(sizeofgth) + sizeof(checksum) + sizeof(data)
-
-
-class IPv4Packet:
-    NO_FRAG = 0b10
-    MORE_FRAG = 0b1
-
-    class UpperLayerProtocol(Enum):
-        TCP = 6
-        UDP = 17
-
-    def __init__(self, src_ip, dest_ip, upper_layer_protocol, data: TransportLayerPacket, options = None):
-        self.src_ip = src_ip
-        self.dest_ip = dest_ip
-        self.data = data
-        self.upper_layer_protocol = upper_layer_protocol
-        self.header_length = 20 # 20 bytes if there aren't any extra options
-        self.datagram_length =  self.header_length + len(data)
-        self.identifier = 0
-        self.type_of_service = 0
-        self.ttl = 128
-        self.header_checksum = 1111
-        self.fragment_offset = 0
-        self.flags = 0b000
-        self.options = options
-
+from ethernet import *
+from transport_layer import *
+from network_layer import *
+from datalink_layer import *
+from node import Node
 
 class ARP:
     REQUEST = 1
@@ -78,74 +18,6 @@ class ARP:
         self.type = typ
 
 
-class Node:
-    def connect(self, port, device):
-        pass
-
-    def send(self, dest_ip: str, frame: EthernetFrame):
-        pass
-
-    def receive(self, src_ip: str, frame: EthernetFrame):
-        pass
-
-
-class Switch(Node):
-    def __init__(self, port_count: int):
-        self.port_count = port_count
-        self.mac_table = dict()
-        self.hosts = dict()
-
-    def connect(self, port_number: int, host) -> None:
-        if port_number in self.mac_table.keys():
-            return
-
-        if port_number < 1 or port_number > self.port_count:
-            return
-
-        self.mac_table[host.mac_addr] = port_number
-        self.hosts[port_number] = host
-
-    def send(self, dest_ip: str, frame: EthernetFrame):
-        dest_mac = frame.dest_mac
-        if dest_mac in self.mac_table.keys():
-            port = self.mac_table.get(dest_mac)
-            self.send_through_port(port, frame)
-        else:
-            self.flood(frame)
-
-    def send_through_port(self, port_number: int, frame: EthernetFrame):
-        if frame.type == EthernetFrame.ARP:
-            src_ip = frame.data.sender_protocol_addr
-        elif frame.type == EthernetFrame.IPV4:
-            src_ip = frame.data.src_ip
-        self.hosts.get(port_number).receive(src_ip, frame)
-
-    def receive(self, src_ip: str, frame: EthernetFrame):
-        pass
-
-    def flood(self, frame: EthernetFrame):
-        for receiver in self.hosts.values():
-            arp = frame.data
-            if arp.sender_protocol_addr != receiver.ip_addr:
-                receiver.receive(arp.sender_protocol_addr, frame)
-
-
-class Router(Node):
-    def __init__(self):
-        self.interfaces = dict()
-        self.routing_table = dict()
-        self.arp_table = dict()
-
-    def connect(self, port, device):
-        pass
-
-    def send(self, dest_ip: str, frame: EthernetFrame):
-        pass
-
-    def receive(self, src_ip: str, frame: EthernetFrame):
-        pass
-
-
 class Host(Node):
     def __init__(self, ip_addr: str, mac_addr: str):
         self.mac_addr = mac_addr
@@ -154,10 +26,11 @@ class Host(Node):
         self.arp_table = dict()
         self.default_gateway = "192.168.1.255"
         self.subnet_mask = "255.255.255.0"
+        self.ethernet_port = EthernetPort()
 
-    def connect(self, port_number: int, device) -> None:
+    def connect(self, device) -> None:
         self.ether_connection = device
-        device.connect(port_number, self)
+        self.ethernet_port.connect(device)
 
     def dump_arp_request_frame(self, frame):
         arp = frame.data
@@ -184,7 +57,7 @@ class Host(Node):
         arp = ARP(self.mac_addr, self.ip_addr, None, ip_addr, ARP.REQUEST)
         frame = EthernetFrame(self.mac_addr, "ffff:ffff:ffff:ffff", arp, typ=EthernetFrame.ARP)
         self.dump_arp_request_frame(frame)
-        self.ether_connection.send(ip_addr, frame)
+        self.ethernet_port.connected_device.receive(frame)
 
     def do_subnet_mask(self, ip_addr):
         ip = list(map(int, ip_addr.split('.')))
@@ -203,16 +76,9 @@ class Host(Node):
     def create_ethernet_frame(self, src_mac, dest_mac, data, typ):
         return EthernetFrame(src_mac, dest_mac, data, typ)
 
-    def send(self, dest_ip: str, frame: EthernetFrame):
-        dest_mac = self.arp_table.get(dest_ip)
-        if not dest_mac:
-            is_lan = self.do_subnet_mask(dest_ip)
-            if is_lan:
-                frame.dest_mac = self.make_arp_request(dest_ip)
-            else:
-                frame.dest_mac = self.make_arp_request(self.default_gateway)
-
-        self.ether_connection.send(dest_ip, frame)
+    def send(self, frame: EthernetFrame):
+        device = self.ethernet_port.connected_device
+        device.receive(frame)
 
     def send_data(self, dest_ip: str, dest_port: int, data: bytes):
         ether_data = self.create_network_packet(
@@ -220,12 +86,27 @@ class Host(Node):
                     dest_ip, 
                     self.create_transport_packet(1000, dest_port, TransportLayerPacket.UDP, data)
                 )
-        frame = self.create_ethernet_frame(self.mac_addr, None, ether_data, EthernetFrame.IPV4)
-        self.send(dest_ip, frame)
+        frame = self.create_ethernet_frame(
+            self.mac_addr, 
+            None, 
+            ether_data, 
+            EthernetFrame.IPV4
+        )
+        dest_mac = self.arp_table.get(dest_ip)
+        if not dest_mac:
+            is_lan = self.do_subnet_mask(dest_ip)
+            if is_lan:
+                self.make_arp_request(dest_ip)
+            else:
+                self.make_arp_request(self.default_gateway)
 
-    def receive(self, src_ip: str, frame: EthernetFrame):
+        frame.dest_mac = self.arp_table.get(dest_ip)
+        self.send(frame)
+
+    def receive(self, frame: EthernetFrame):
         if frame.type == EthernetFrame.ARP:
             arp = frame.data
+            src_ip = arp.sender_protocol_addr
             self.arp_table[src_ip] = arp.sender_hardware_addr
             if arp.type == ARP.REQUEST:
                 if arp.target_protocol_addr == self.ip_addr:
@@ -237,19 +118,22 @@ class Host(Node):
                             typ=ARP.REPLY
                         )
                     fram = EthernetFrame(self.mac_addr, frame.src_mac, arpp, EthernetFrame.ARP)
-                    self.send(src_ip, fram)
+                    self.send(fram)
             elif arp.type == ARP.REPLY:
-                arpp = frame.data
                 self.dump_arp_response_frame(frame)
         elif frame.type == EthernetFrame.IPV4:
             self.dump_ipv4_frame(frame)
 
 
-host_a = Host(mac_addr = "aaaa.bbbb.cccc.dddd", ip_addr = "192.168.1.1")
-host_b = Host(mac_addr = "aaaa.bbbb.cccc.eeee", ip_addr = "192.168.1.2")
-switch = Switch(4)
+if __name__ == "__main__":
+    host_a = Host(mac_addr = "aaaa.bbbb.cccc.dddd", ip_addr = "192.168.1.1")
+    host_b = Host(mac_addr = "aaaa.bbbb.cccc.eeee", ip_addr = "192.168.1.2")
+    switch = Switch(4)
 
-host_a.connect(1, switch)
-host_b.connect(2, switch)
+    host_a.connect(switch)
+    switch.connect_on_port(1, host_a)
 
-host_a.send_data("192.168.1.2", 80, b'\xca\xfe\xba\xbe')
+    host_b.connect(switch)
+    switch.connect_on_port(2, host_b)
+
+    host_a.send_data("192.168.1.2", 80, b'\xca\xfe')

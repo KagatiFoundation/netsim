@@ -35,14 +35,20 @@ class Host(Node):
     def dump_arp_request_frame(self, frame):
         arp = frame.data
         print("\n*** ARP Request ***")
-        print(f'{arp.sender_protocol_addr} ==> {arp.target_protocol_addr}')
-        print(f'Data: Who is {arp.target_protocol_addr}?')
+        print(f'\t{arp.sender_protocol_addr} ==> {arp.target_protocol_addr}')
+        print(f'\tData: Who is {arp.target_protocol_addr}?')
 
     def dump_arp_response_frame(self, frame):
         arp = frame.data
         print("\n*** ARP Response ***")
-        print(f'{arp.sender_protocol_addr} ==> {arp.target_protocol_addr}')
-        print(f'Data: {arp.sender_hardware_addr} is {arp.sender_protocol_addr}')
+        print(f'\t{arp.sender_protocol_addr} ==> {arp.target_protocol_addr}')
+        print(f'\tData: {arp.sender_hardware_addr} is {arp.sender_protocol_addr}')
+
+    def dump_ethernet_frame(self, frame, title = True):
+        if title:
+            print("\n*** Ethernet Frame ***")
+        
+        print(f'\tFrame length: {45} bytes ({45 * 8} bits)') # dummy data
 
     def dump_ipv4_frame(self, frame):
         ipv4 = frame.data
@@ -50,8 +56,8 @@ class Host(Node):
 
         if upper_layer_protocol == IPv4Packet.UpperLayerProtocol.UDP:
             print("\n*** UDP ***")
-            print(f'{ipv4.src_ip} ==> {ipv4.dest_ip}')
-            print(f'Data: {ipv4.data.data}')
+            print(f'\t{ipv4.src_ip} ==> {ipv4.dest_ip}')
+            print(f'\tData: {ipv4.data.data}')
 
     def make_arp_request(self, ip_addr: str) -> str:
         arp = ARP(self.mac_addr, self.ip_addr, None, ip_addr, ARP.REQUEST)

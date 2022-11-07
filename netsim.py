@@ -38,46 +38,63 @@ class Host(Node):
 
     def dump_ethernet_frame(self, frame: EthernetFrame):
         print()
-        print('-' * 50)
-        print('| --- Start Ethernet frame ---')
+
+        ETHERNET_FRAME_BORDER_LEN = 100
+        print('+' + ('-' * (ETHERNET_FRAME_BORDER_LEN - 2)) + '+')
         length = frame.length
-        print(f'| \tFrame length: {length} bytes ({length * 8} bits)') # dummy data
-        print('| --- End Ethernet frame ---')
-        print('-' * 50)
+        messages = [
+            f'|        Frame length: {length} bytes ({length * 8} bits)',
+        ]
 
-    def dump_arp_request_frame(self, frame):
-        arp = frame.data
-        self.dump_ethernet_frame(frame)
-        print("| --- Start ARP Request ---")
-        print(f'| \t{arp.sender_protocol_addr} ==> {arp.target_protocol_addr}')
-        print(f'| \tData: Who is {arp.target_protocol_addr}?')
-        print("| --- End ARP request ---")
-        print('-' * 50)
+        frame_start_border_title = '| --- Ethernet frame ---'
+        print(frame_start_border_title+ (ETHERNET_FRAME_BORDER_LEN - len(frame_start_border_title) - 1) * ' ' + '|')
+        for message in messages:
+            print(message + (ETHERNET_FRAME_BORDER_LEN - len(message) - 1) * ' ' + '|')
 
-    def dump_arp_response_frame(self, frame):
-        arp = frame.data
-        self.dump_ethernet_frame(frame)
-        print("| --- Start ARP Response ---")
-        print(f'| \t{arp.sender_protocol_addr} ==> {arp.target_protocol_addr}')
-        print(f'| \tData: {arp.sender_hardware_addr} is {arp.sender_protocol_addr}')
-        print("| --- End ARP response ---")
-        print('-' * 50)
+        if frame.type == EthernetFrame.ARP:
+            self.dump_arp_frame(frame.data)
+
+        frame_end_border_title = '| --- End Ethernet frame ---'
+        print(frame_end_border_title + (ETHERNET_FRAME_BORDER_LEN - len(frame_end_border_title) - 1) * ' ' + '|')
+        print('+' + ('-' * (ETHERNET_FRAME_BORDER_LEN - 2)) + '+')
+
+    def dump_arp_frame(self, arp):
+        header = "Request"
+        target_mac = arp.target_hardware_addr
+        if arp.type == ARP.REPLY:
+            header = "Reply"
+            target_mac = "00:00:00:00:00:00"
+
+        ARP_FRAME_BORDER_LEN = 80
+        arp_frame = '|        +' + ('-' * (ARP_FRAME_BORDER_LEN - 2)) + '+'
+        arp_frame += ((100 - len(arp_frame) - 1) * ' ') + '|'
+        messages = [
+            f'|        | --- ARP ({header}) ---',
+            f'|        |        Hardware type: Ethernet (1)',
+            f'|        |        Protocol type: IPv4 (0x0800',
+            f'|        |        Hardware size: 6',
+            f'|        |        Protocol size: 4',
+            f'|        |        Sender MAC address: {arp.sender_hardware_addr}',
+            f'|        |        Sender IP address: {arp.sender_protocol_addr}',
+            f'|        |        Target MAC address: {target_mac}',
+            f'|        |        Target IP address: {arp.target_protocol_addr}',
+            f'|        |        Who has {arp.target_protocol_addr}? Tell {arp.sender_protocol_addr}',
+            f'|        | --- End ARP ---',
+        ]
+
+        print(arp_frame)
+        for message in messages:
+            act_out_msg = message + (ARP_FRAME_BORDER_LEN - len(message) + 8) * ' ' + '|'
+            length = len(act_out_msg)
+            print(act_out_msg, (100 - length - 2) * ' ' + '|')
+        print(arp_frame)
+        
 
     def dump_ipv4_frame(self, frame):
-        ipv4 = frame.data
-        self.dump_ethernet_frame(frame)
-        print("| --- Start IPv4 packet ---")
-        print(f'| \t{ipv4.src_ip} ==> {ipv4.dest_ip}')
-        print("| --- End IPv4 packet ---")
-        print('-' * 50)
+        pass
 
     def dump_udp_frame(self, frame):
-        udp = frame.data.data
-        self.dump_ipv4_frame(frame)
-        print('| --- Start UDP frame ---')
-        print(f'| \tUDP Data: {udp.data}')
-        print('| --- End UDP frame ---')
-        print('-' * 50)
+        pass
 
     def make_arp_request(self, ip_addr: str) -> str:
         arp = ARP(self.mac_addr, self.ip_addr, None, ip_addr, ARP.REQUEST)
@@ -138,11 +155,11 @@ class Host(Node):
 
     def receive(self, frame: EthernetFrame):
         if frame.type == EthernetFrame.ARP:
+            self.dump_ethernet_frame(frame)
             arp = frame.data
             src_ip = arp.sender_protocol_addr
             self.arp_table[src_ip] = arp.sender_hardware_addr
             if arp.type == ARP.REQUEST:
-                self.dump_arp_request_frame(frame)
                 if arp.target_protocol_addr == self.ip_addr:
                     arpp = ARP(
                             self.mac_addr, 
@@ -155,7 +172,7 @@ class Host(Node):
                     self.send(fram)
                 else: return False
             elif arp.type == ARP.REPLY:
-                self.dump_arp_response_frame(frame)
+                pass
             else: return False
         elif frame.type == EthernetFrame.IPV4:
             ipv4 = frame.data
@@ -176,4 +193,3 @@ if __name__ == "__main__":
     switch.connect_on_port(2, host_b)
 
     host_a.send_data("192.168.1.3", 80, b'\xca\xfe')
-    host_a.send_data("192.168.1.3", 80, b'\xba\xbe\xfe')

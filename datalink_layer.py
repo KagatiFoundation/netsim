@@ -26,21 +26,20 @@ class Switch(Node):
     def send(self, frame: EthernetFrame) -> None:
         dest_mac = frame.dest_mac
         port = self.mac_table.get(dest_mac)
-        self.send_through_port(port, frame)
+        return self.send_through_port(port, frame)
 
     def send_through_port(self, port_number: int, frame: EthernetFrame):
-        self.ports.get(port_number).connected_device.receive(frame)
+        return self.ports.get(port_number).connected_device.receive(frame)
 
     def receive(self, frame: EthernetFrame) -> None:
-        if frame.dest_mac == "ffff:ffff:ffff:ffff":
-            self.flood(frame)
-        else:
-            self.send(frame)
+        if frame.dest_mac == "ffff:ffff:ffff:ffff": return self.flood(frame)
+        else: return self.send(frame)
 
     def flood(self, frame: EthernetFrame) -> None:
+        arp_sender_ip = frame.data.sender_protocol_addr
         for port in self.ports.values():
             receiver = port.connected_device
             if receiver:
-                arp = frame.data
-                if arp.sender_protocol_addr != receiver.ip_addr:
-                    receiver.receive(frame)
+                if arp_sender_ip != receiver.ip_addr:
+                    if receiver.receive(frame): return True
+        return False

@@ -19,7 +19,7 @@ class IPv4Packet:
         self.data = data
         self.upper_layer_protocol = upper_layer_protocol
         self.header_length = 20 # 20 bytes if there aren't any extra options
-        self.datagram_length =  self.header_length + len(data)
+        self.datagram_length =  len(self)
         self.identifier = 0
         self.type_of_service = 0
         self.ttl = 128
@@ -27,6 +27,9 @@ class IPv4Packet:
         self.fragment_offset = 0
         self.flags = 0b000
         self.options = options
+
+    def __len__(self):
+        return self.header_length + len(self.data)
 
 
 class Router():

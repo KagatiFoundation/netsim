@@ -13,6 +13,7 @@ class EthernetFrame:
         self.type = typ
         self.preamble = 0
         self.crc = 0
+        self.length = 26 + len(data)
 
 
 class EthernetCable:

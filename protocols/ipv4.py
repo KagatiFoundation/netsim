@@ -43,6 +43,15 @@ class IPv4:
         if not IPv4.is_valid_ipv4(ip): return False
         return any([IPv4.is_class_a_ip(ip), IPv4.is_class_b_ip(ip), IPv4.is_class_c_ip(ip)])
 
+    @staticmethod
+    def ipv4_to_binary(ip: str):
+        if not IPv4.is_valid_ipv4(ip): return ""
+        octets = ip.split('.')
+        output = ""
+        for octet in octets:
+            output += bin(int(octet))[2:].rjust(8, '0')
+        return output
+
 
 class IPv4Packet:
     NO_FRAG = 0b10

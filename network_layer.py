@@ -4,6 +4,7 @@ from enum import Enum
 
 from ethernet import *
 from transport_layer import *
+from node import Node
 
 class IPv4Packet:
     NO_FRAG = 0b10
@@ -32,17 +33,21 @@ class IPv4Packet:
         return self.header_length + len(self.data)
 
 
-class Router():
-    def __init__(self):
-        self.interfaces = dict()
+class Router(Node):
+    def __init__(self, interf_count: int):
+        self.interfaces = {interf_no: EthernetPort() for interf_no in range(interf_count)}
         self.routing_table = dict()
         self.arp_table = dict()
 
-    def connect(self, port, device):
+    def connect(self, device):
+        print("Use method 'connect_on_interface': this method is not supported")
+        sys.exit(1)
+
+    def connect_on_interface(self, interface_no: int, device):
+        self.interfaces.get(interface_no).connect(device)
+
+    def send(self, frame: EthernetFrame):
         pass
 
-    def send(self, dest_ip: str, frame: EthernetFrame):
-        pass
-
-    def receive(self, src_ip: str, frame: EthernetFrame):
+    def receive(self, frame: EthernetFrame):
         pass

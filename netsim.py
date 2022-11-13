@@ -7,6 +7,7 @@ from datalink_layer import *
 from node import Node
 from protocols import ipv4
 from protocols.arp import ARP
+from protocols.icmp import ICMP
 
 class Host(Node):
     def __init__(self, ip_addr: str, mac_addr: str):
@@ -39,6 +40,8 @@ class Host(Node):
 
         if frame.type == EthernetFrame.ARP:
             self.dump_arp_frame(frame.data)
+        elif frame.type == EthernetFrame.IPV4:
+            self.dump_ipv4_frame(frame.data)
 
         frame_end_border_title = '| --- End Ethernet frame ---'
         print(frame_end_border_title + (ETHERNET_FRAME_BORDER_LEN - len(frame_end_border_title) - 1) * ' ' + '|')
@@ -118,8 +121,8 @@ class Host(Node):
             return UDPPacket(src_port, dest_port, data)
         else: return None
 
-    def create_network_packet(self, src_ip, dest_ip, tpacket):
-        return ipv4.IPv4Packet(src_ip, dest_ip, ipv4.IPv4Packet.UpperLayerProtocol.UDP, tpacket)
+    def create_network_packet(self, src_ip, dest_ip, upper_layer_protocol: ipv4.IPv4Packet.UpperLayerProtocol, tpacket):
+        return ipv4.IPv4Packet(src_ip, dest_ip, upper_layer_protocol, tpacket)
 
     def create_ethernet_frame(self, src_mac, dest_mac, data, typ):
         return EthernetFrame(src_mac, dest_mac, data, typ)
@@ -129,11 +132,23 @@ class Host(Node):
         device.receive(frame)
         return True
 
-    def send_data(self, dest_ip: str, dest_port: int, data: bytes):
+    def send_data(self, dest_ip: str, dest_port: int, packet_type, data: bytes):
+        proto = None
+        if packet_type == ipv4.IPv4Packet.UpperLayerProtocol.ICMP:
+            proto = ipv4.IPv4Packet.UpperLayerProtocol.ICMP
+            data = ICMP(8, 0, None, b'')
+        elif packet_type == ipv4.IPv4Packet.UpperLayerProtocol.TCP:
+            proto = ipv4.IPv4Packet.UpperLayerProtocol.TCP
+            data = self.create_transport_packet(1000, dest_port, TransportLayerPacket.TCP, data)
+        elif packet_type == ipv4.IPv4Packet.UpperLayerProtocol.UDP:
+            proto = ipv4.IPv4Packet.UpperLayerProtocol.UDP
+            data = self.create_transport_packet(1000, dest_port, TransportLayerPacket.UDP, data)
+
         ether_data = self.create_network_packet(
                     self.ip_addr, 
                     dest_ip, 
-                    self.create_transport_packet(1000, dest_port, TransportLayerPacket.UDP, data)
+                    proto,
+                    data
                 )
         frame = self.create_ethernet_frame(
             self.mac_addr, 
@@ -179,7 +194,14 @@ class Host(Node):
                 pass
             else: return False
         elif frame.type == EthernetFrame.IPV4:
-            pass
+            ippacket: ipv4.IPv4Packet = frame.data
+            if ippacket.upper_layer_protocol == ipv4.IPv4Packet.UpperLayerProtocol.ICMP:
+                icmpp:ICMP = ippacket.data
+                if icmpp.type == ICMP.REQUEST:
+                    icmpp_reply = ICMP(ICMP.REPLY, 0, None, b'')
+                    net_pack = self.create_network_packet(self.ip_addr, ippacket.src_ip, ipv4.IPv4Packet.UpperLayerProtocol.ICMP, icmpp_reply)
+                    fram = EthernetFrame(self.mac_addr, frame.src_mac, net_pack, EthernetFrame.IPV4)
+                    self.send(fram)
         return True
 
 if __name__ == "__main__":
@@ -193,4 +215,4 @@ if __name__ == "__main__":
     host_b.connect(switch)
     switch.connect_on_port(2, host_b)
 
-    host_a.send_data("192.168.1.5", 80, b'\xca\xfe')
+    host_a.send_data("192.168.1.5", 80, ipv4.IPv4Packet.UpperLayerProtocol.ICMP, b'\xca\xfe')

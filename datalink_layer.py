@@ -9,7 +9,7 @@ class Switch(Node):
         self.port_count = port_count
         self.mac_table = dict()
         self.hosts = dict()
-        self.ports = {port_number: EthernetPort() for port_number in range(port_count)}
+        self.ports = {port_number + 1: EthernetPort() for port_number in range(port_count)}
 
     def connect(self, node = None) -> None:
         print("Use method 'connect_on_port': this method is not supported")
@@ -23,7 +23,7 @@ class Switch(Node):
         self.ports.get(port_number).connect(device)
         self.mac_table[device.mac_addr] = port_number
 
-    def send(self, frame: EthernetFrame) -> None:
+    def send(self, frame: EthernetFrame):
         dest_mac = frame.dest_mac
         port = self.mac_table.get(dest_mac)
         return self.send_through_port(port, frame)
@@ -31,11 +31,11 @@ class Switch(Node):
     def send_through_port(self, port_number: int, frame: EthernetFrame):
         return self.ports.get(port_number).connected_device.receive(frame)
 
-    def receive(self, frame: EthernetFrame) -> None:
+    def receive(self, frame: EthernetFrame):
         if frame.dest_mac == "ffff:ffff:ffff:ffff": return self.flood(frame)
         else: return self.send(frame)
 
-    def flood(self, frame: EthernetFrame) -> None:
+    def flood(self, frame: EthernetFrame):
         arp_sender_ip = frame.data.sender_protocol_addr
         for port in self.ports.values():
             receiver = port.connected_device

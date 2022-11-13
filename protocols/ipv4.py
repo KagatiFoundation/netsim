@@ -58,6 +58,7 @@ class IPv4Packet:
     MORE_FRAG = 0b1
 
     class UpperLayerProtocol(Enum):
+        ICMP = 1
         TCP = 6
         UDP = 17
 

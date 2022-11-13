@@ -76,8 +76,23 @@ class Host(Node):
         print(arp_frame)
         
 
-    def dump_ipv4_frame(self, frame):
-        pass
+    def dump_ipv4_frame(self, ippacket: ipv4.IPv4Packet):
+        IP_BORDER_LEN = 80
+        ipv4_frame = '|        +' + ('-' * (IP_BORDER_LEN - 2)) + '+'
+        ipv4_frame += ((100 - len(ipv4_frame) - 1) * ' ') + '|'
+        messages = [
+            f'|        | --- IPv4 ---',
+            f'|        |        Source address: {ippacket.src_ip}',
+            f'|        |        Destination address: {ippacket.dest_ip}',
+            f'|        | --- End IPv4 ---'
+        ]
+
+        print(ipv4_frame)
+        for message in messages:
+            act_out_msg = message + (IP_BORDER_LEN - len(message) + 8) * ' ' + '|'
+            length = len(act_out_msg)
+            print(act_out_msg, (100 - length - 2) * ' ' + '|')
+        print(ipv4_frame)
 
     def dump_udp_frame(self, frame):
         pass
@@ -104,7 +119,7 @@ class Host(Node):
         else: return None
 
     def create_network_packet(self, src_ip, dest_ip, tpacket):
-        return IPv4Packet(src_ip, dest_ip, IPv4Packet.UpperLayerProtocol.UDP, tpacket)
+        return ipv4.IPv4Packet(src_ip, dest_ip, ipv4.IPv4Packet.UpperLayerProtocol.UDP, tpacket)
 
     def create_ethernet_frame(self, src_mac, dest_mac, data, typ):
         return EthernetFrame(src_mac, dest_mac, data, typ)

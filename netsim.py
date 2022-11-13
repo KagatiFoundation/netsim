@@ -5,30 +5,16 @@ from transport_layer import *
 from network_layer import *
 from datalink_layer import *
 from node import Node
-
-class ARP:
-    REQUEST = 1
-    REPLY = 2
-
-    def __init__(self, sha, spa, tha, tpa, typ):
-        self.sender_hardware_addr = sha
-        self.sender_protocol_addr = spa
-        self.target_hardware_addr = tha
-        self.target_protocol_addr = tpa
-        self.type = typ
-        self.length = len(self)
-
-    def __len__(self):
-        return 45
-
+from protocols import ipv4
+from protocols.arp import ARP
 
 class Host(Node):
     def __init__(self, ip_addr: str, mac_addr: str):
         self.mac_addr = mac_addr
         self.ip_addr = ip_addr
         self.ether_connection = None
-        self.arp_table = dict()
-        self.default_gateway = "192.168.1.255"
+        self.arp_table = {"localhost": self.mac_addr, "127.0.0.1": self.mac_addr}
+        self.default_gateway = "192.168.1.254"
         self.subnet_mask = "255.255.255.0"
         self.ethernet_port = EthernetPort()
 
@@ -140,10 +126,11 @@ class Host(Node):
             ether_data, 
             EthernetFrame.IPV4
         )
+
         dest_mac = self.arp_table.get(dest_ip)
         arp_result = True
         if not dest_mac:
-            is_lan = self.do_subnet_mask(dest_ip)
+            is_lan = ipv4.IPv4.is_private_ip(dest_ip)
             if is_lan:
                 arp_result = self.make_arp_request(dest_ip)
             else:
@@ -154,8 +141,10 @@ class Host(Node):
             return self.send(frame)
 
     def receive(self, frame: EthernetFrame):
+        if not frame: return False 
+        self.dump_ethernet_frame(frame)
+
         if frame.type == EthernetFrame.ARP:
-            self.dump_ethernet_frame(frame)
             arp = frame.data
             src_ip = arp.sender_protocol_addr
             self.arp_table[src_ip] = arp.sender_hardware_addr
@@ -175,21 +164,18 @@ class Host(Node):
                 pass
             else: return False
         elif frame.type == EthernetFrame.IPV4:
-            ipv4 = frame.data
-            if ipv4.upper_layer_protocol == IPv4Packet.UpperLayerProtocol.UDP:
-                self.dump_udp_frame(frame)
+            pass
         return True
 
-
 if __name__ == "__main__":
-    host_a = Host(mac_addr = "aaaa.bbbb.cccc.dddd", ip_addr = "192.168.1.1")
-    host_b = Host(mac_addr = "aaaa.bbbb.cccc.eeee", ip_addr = "192.168.1.3")
+    host_a = Host(mac_addr = "fa:ce:de:ad:be:ef", ip_addr = "192.168.1.4")
     switch = Switch(4)
 
     host_a.connect(switch)
     switch.connect_on_port(1, host_a)
 
+    host_b = Host(mac_addr = "aa:aa:bb:bb:cc:dd", ip_addr = "192.168.1.5")
     host_b.connect(switch)
     switch.connect_on_port(2, host_b)
 
-    host_a.send_data("192.168.1.3", 80, b'\xca\xfe')
+    host_a.send_data("192.168.1.5", 80, b'\xca\xfe')

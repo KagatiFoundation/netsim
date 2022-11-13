@@ -7,33 +7,6 @@ from transport_layer import *
 from node import Node
 from protocols.arp import ARP
 
-class IPv4Packet:
-    NO_FRAG = 0b10
-    MORE_FRAG = 0b1
-
-    class UpperLayerProtocol(Enum):
-        TCP = 6
-        UDP = 17
-
-    def __init__(self, src_ip, dest_ip, upper_layer_protocol, data: TransportLayerPacket, options = None):
-        self.src_ip = src_ip
-        self.dest_ip = dest_ip
-        self.data = data
-        self.upper_layer_protocol = upper_layer_protocol
-        self.header_length = 20 # 20 bytes if there aren't any extra options
-        self.datagram_length =  len(self)
-        self.identifier = 0
-        self.type_of_service = 0
-        self.ttl = 128
-        self.header_checksum = 1111
-        self.fragment_offset = 0
-        self.flags = 0b000
-        self.options = options
-
-    def __len__(self):
-        return self.header_length + len(self.data)
-
-
 class Router(Node):
     def __init__(self, ip_addr: str, mac_addr: str, interf_count: int):
         self.interfaces = {interf_no + 1: EthernetPort() for interf_no in range(interf_count)}

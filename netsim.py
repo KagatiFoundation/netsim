@@ -9,6 +9,9 @@ from protocols import ipv4
 from protocols.arp import ARP
 from protocols.icmp import ICMP
 
+import pickle
+import random as rand
+
 class Host(Node):
     def __init__(self, ip_addr: str, mac_addr: str):
         self.mac_addr = mac_addr
@@ -18,6 +21,7 @@ class Host(Node):
         self.default_gateway = "192.168.1.254"
         self.subnet_mask = "255.255.255.0"
         self.ethernet_port = EthernetPort()
+        self.mtu = 1500 # Maximum Transmission Unit
 
     def connect(self, device) -> None:
         self.ether_connection = device
@@ -94,6 +98,15 @@ class Host(Node):
             f'|        | --- IPv4 ---',
             f'|        |        Source address: {ippacket.src_ip}',
             f'|        |        Destination address: {ippacket.dest_ip}',
+            f'|        |        Total Length: {ippacket.datagram_length}',
+            f'|        |        Identification: {hex(ippacket.identifier)} ({ippacket.identifier})',
+            f'|        |        Flags: {hex(ippacket.flags)}',
+            f'|        |        ... Reserved bit: Not set',
+            f'|        |        ... Don\'t Fragment: {"Set" if ippacket.flags & 0b10 else "Not set"}',
+            f'|        |        ... More Fragments: {"Set" if ippacket.flags & 0b1 else "Not set"}',
+            f'|        |        Fragment Offset: {hex(ippacket.fragment_offset)}',
+            f'|        |        Time to Live: {ippacket.ttl}',
+            f'|        |        Header Checksum: {hex(ippacket.header_checksum)}',
             f'|        |        Protocol: {ipv4.IPv4Packet.UpperLayerProtocol(ippacket.upper_layer_protocol).name} ({ippacket.upper_layer_protocol.value})',
             f'|        | --- End IPv4 ---'
         ]
@@ -129,8 +142,29 @@ class Host(Node):
             return UDPPacket(src_port, dest_port, data)
         else: return None
 
+    '''
+    This method returns fragmented IP packets given the data.
+    If the data size is MTU, then this fragments data to fit into 
+    the MTU size.
+    '''
     def create_network_packet(self, src_ip, dest_ip, upper_layer_protocol: ipv4.IPv4Packet.UpperLayerProtocol, tpacket):
-        return ipv4.IPv4Packet(src_ip, dest_ip, upper_layer_protocol, tpacket)
+        raw_bytes = pickle.dumps(tpacket)
+        data_length = len(raw_bytes)
+        identifier = rand.randint(0xFFFF, 0xFFFFFFFF)
+
+        if data_length <= self.mtu:
+            yield ipv4.IPv4Packet(src_ip, dest_ip, upper_layer_protocol, raw_bytes, identifier=identifier)
+
+        buffer_pointer = 0
+        while True:
+            yield ipv4.IPv4Packet(src_ip, dest_ip, upper_layer_protocol, raw_bytes[buffer_pointer:buffer_pointer + self.mtu], identifier=identifier, flags=0b001)
+            buffer_pointer += self.mtu
+            left_data = raw_bytes[buffer_pointer:]
+            if len(left_data) > self.mtu:
+                continue
+            else:
+                yield ipv4.IPv4Packet(src_ip, dest_ip, upper_layer_protocol, left_data, identifier=identifier)
+                break
 
     def create_ethernet_frame(self, src_mac, dest_mac, data, typ):
         return EthernetFrame(src_mac, dest_mac, data, typ)
@@ -152,19 +186,6 @@ class Host(Node):
             proto = ipv4.IPv4Packet.UpperLayerProtocol.UDP
             data = self.create_transport_packet(1000, dest_port, TransportLayerPacket.UDP, data)
 
-        ether_data = self.create_network_packet(
-                    self.ip_addr, 
-                    dest_ip, 
-                    proto,
-                    data
-                )
-        frame = self.create_ethernet_frame(
-            self.mac_addr, 
-            None, 
-            ether_data, 
-            EthernetFrame.IPV4
-        )
-
         dest_mac = self.arp_table.get(dest_ip)
         arp_result = True
         if not dest_mac:
@@ -174,9 +195,24 @@ class Host(Node):
             else:
                 arp_result = self.make_arp_request(self.default_gateway)
 
+        ether_data = self.create_network_packet(
+                    self.ip_addr, 
+                    dest_ip, 
+                    proto,
+                    data
+                )
+        frame = self.create_ethernet_frame(
+            self.mac_addr, 
+            None, 
+            None, 
+            EthernetFrame.IPV4
+        )
+
         if arp_result:
             frame.dest_mac = self.arp_table.get(dest_ip)
-            return self.send(frame)
+            for ippacket in ether_data:
+                frame.data = ippacket
+                self.send(frame)
 
     def receive(self, frame: EthernetFrame):
         if not frame: return False 
@@ -223,5 +259,4 @@ if __name__ == "__main__":
     host_b.connect(switch)
     switch.connect_on_port(2, host_b)
 
-    host_a.send_data("192.168.1.5", 80, ipv4.IPv4Packet.UpperLayerProtocol.ICMP, b'\xca\xfe')
-    host_a.send_data("192.168.1.5", 80, ipv4.IPv4Packet.UpperLayerProtocol.UDP, b'\xba\xbe')
+    host_a.send_data("192.168.1.5", 80, ipv4.IPv4Packet.UpperLayerProtocol.UDP, b'\xba' * 1600)

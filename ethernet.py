@@ -9,11 +9,20 @@ class EthernetFrame:
     def __init__(self, src_mac: str, dest_mac: str, data, typ=None):
         self.src_mac = src_mac
         self.dest_mac = dest_mac
-        self.data = data
+        self._data = data
         self.type = typ
         self.preamble = 0
         self.crc = 0
-        self.length = 26 + len(data)
+        self.length = 26 + len(data) if data else 0
+
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, new_data):
+        self._data = new_data
+        self.length = 26 + len(new_data)
 
 
 class EthernetCable:

@@ -62,18 +62,18 @@ class IPv4Packet:
         TCP = 6
         UDP = 17
 
-    def __init__(self, src_ip, dest_ip, upper_layer_protocol, data: TransportLayerPacket, options = None):
+    def __init__(self, src_ip, dest_ip, upper_layer_protocol, data: TransportLayerPacket, identifier: int = 0x0, offset: int = 0x0, options = None):
         self.src_ip = src_ip
         self.dest_ip = dest_ip
         self.data = data
         self.upper_layer_protocol = upper_layer_protocol
         self.header_length = 20 # 20 bytes if there aren't any extra options
         self.datagram_length =  len(self)
-        self.identifier = 0
+        self.identifier = identifier
         self.type_of_service = 0
         self.ttl = 128
         self.header_checksum = 1111
-        self.fragment_offset = 0
+        self.fragment_offset = offset
         self.flags = 0b000
         self.options = options
 

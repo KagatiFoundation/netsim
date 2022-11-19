@@ -1,0 +1,19 @@
+#!/bin/sh
+
+clean()
+{
+    rm -fIvr __pycache__ main *.o
+}
+
+action="$1"
+case $action in
+    "clean") 
+        clean;
+        ;;
+    "run") 
+        python3 netsim.py;
+        ;;
+    *)
+        echo "Usage: ./shell [clean|run]";
+        ;;
+esac

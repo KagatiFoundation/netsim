@@ -26,11 +26,19 @@ class Host(Node):
     def dump_ethernet_frame(self, frame: EthernetFrame):
         print()
 
+        if frame.type == EthernetFrame.ARP:
+            typp = f'ARP ({hex(EthernetFrame.ARP)})'
+        elif frame.type == EthernetFrame.IPV4:
+            typp = f'IPv4 ({hex(EthernetFrame.IPV4)})'
+
         ETHERNET_FRAME_BORDER_LEN = 100
         print('+' + ('-' * (ETHERNET_FRAME_BORDER_LEN - 2)) + '+')
         length = frame.length
         messages = [
             f'|        Frame length: {length} bytes ({length * 8} bits)',
+            f'|        Destination: {frame.dest_mac}',
+            f'|        Source: {frame.src_mac}',
+            f'|        Type: {typp}'
         ]
 
         frame_start_border_title = '| --- Ethernet frame ---'
@@ -49,10 +57,9 @@ class Host(Node):
 
     def dump_arp_frame(self, arp):
         header = "Request"
-        target_mac = arp.target_hardware_addr
+        target_mac = arp.target_hardware_addr if arp.target_hardware_addr else '00:00:00:00:00:00'
         if arp.type == ARP.REPLY:
             header = "Reply"
-            target_mac = "00:00:00:00:00:00"
 
         ARP_FRAME_BORDER_LEN = 80
         arp_frame = '|        +' + ('-' * (ARP_FRAME_BORDER_LEN - 2)) + '+'
@@ -60,7 +67,7 @@ class Host(Node):
         messages = [
             f'|        | --- ARP ({header}) ---',
             f'|        |        Hardware type: Ethernet (1)',
-            f'|        |        Protocol type: IPv4 (0x0800',
+            f'|        |        Protocol type: IPv4 (0x0800)',
             f'|        |        Hardware size: 6',
             f'|        |        Protocol size: 4',
             f'|        |        Sender MAC address: {arp.sender_hardware_addr}',
@@ -87,6 +94,7 @@ class Host(Node):
             f'|        | --- IPv4 ---',
             f'|        |        Source address: {ippacket.src_ip}',
             f'|        |        Destination address: {ippacket.dest_ip}',
+            f'|        |        Protocol: {ipv4.IPv4Packet.UpperLayerProtocol(ippacket.upper_layer_protocol).name} ({ippacket.upper_layer_protocol.value})',
             f'|        | --- End IPv4 ---'
         ]
 
@@ -216,3 +224,4 @@ if __name__ == "__main__":
     switch.connect_on_port(2, host_b)
 
     host_a.send_data("192.168.1.5", 80, ipv4.IPv4Packet.UpperLayerProtocol.ICMP, b'\xca\xfe')
+    host_a.send_data("192.168.1.5", 80, ipv4.IPv4Packet.UpperLayerProtocol.UDP, b'\xba\xbe')

@@ -51,3 +51,10 @@ class Switch(Node):
                 if sender_mac != receiver.mac_addr:
                     if receiver.receive(frame): return True
         return False
+
+    def display_mac_table(self):
+        print(f'{"MAC Address Table":^50}')
+        print(f"{'':-^50}")
+        print("MAC Address\t\t\tPort\n----------\t\t\t-------")
+        for port, mac in enumerate(self.mac_table):
+            print(mac + "\t\t" + str(port))

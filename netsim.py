@@ -131,12 +131,12 @@ class Host(Node):
             return False
         return True
 
-    def on_same_subnetwork(self, dest_ip):
-        src_bin = ipv4.IPv4.ipv4_to_binary(self.ip_addr)
-        subnet_bin = ipv4.IPv4.ipv4_to_binary(self.subnet_mask)
-        dest_bin = ipv4.IPv4.ipv4_to_binary(dest_ip)
-        my_network = int(f'0b{src_bin}', 2) & int(f'0b{subnet_bin}', 2)
-        return my_network == (int(f'0b{dest_bin}', 2) & int(f'0b{subnet_bin}', 2))
+    def on_same_subnetwork(src_ip, subnet, dest_ip):
+        src = int(f'0b{ipv4.IPv4.ipv4_to_binary(src_ip)}', 2)
+        sub = int(f'0b{ipv4.IPv4.ipv4_to_binary(subnet)}', 2)
+        dest = int(f'0b{ipv4.IPv4.ipv4_to_binary(dest_ip)}', 2)
+        my_network = src & sub
+        return my_network == (sub & dest)
 
     def create_transport_packet(self, src_port: int, dest_port: int, protocol, data: bytes):
         if protocol == TransportLayerPacket.UDP:

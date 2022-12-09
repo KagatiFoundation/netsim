@@ -126,16 +126,17 @@ class Host(Node):
         frame = EthernetFrame(self.mac_addr, "ffff:ffff:ffff:ffff", arp, typ=EthernetFrame.ARP)
         result = self.ethernet_port.connected_device.receive(frame)
         if not result:
-            print("\n*** ARP request timeout ***")
-            print("\tHost unreachable")
+            print(f"\n{'ARP request timeout':.^50}")
+            print(f"{'Host unreachable':.^50}")
             return False
         return True
 
-    def do_subnet_mask(self, ip_addr):
-        ip = list(map(int, ip_addr.split('.')))
-        subnet = list(map(int, self.subnet_mask.split(".")))
-        results = list(map(int, [x[0] & x[1] for x in zip(ip, subnet)]))
-        return set(ip[:3]) == set(results[:3])
+    def on_same_subnetwork(self, dest_ip):
+        src_bin = ipv4.IPv4.ipv4_to_binary(self.ip_addr)
+        subnet_bin = ipv4.IPv4.ipv4_to_binary(self.subnet_mask)
+        dest_bin = ipv4.IPv4.ipv4_to_binary(dest_ip)
+        my_network = int(f'0b{src_bin}', 2) & int(f'0b{subnet_bin}', 2)
+        return my_network == (int(f'0b{dest_bin}', 2) & int(f'0b{subnet_bin}', 2))
 
     def create_transport_packet(self, src_port: int, dest_port: int, protocol, data: bytes):
         if protocol == TransportLayerPacket.UDP:
@@ -144,7 +145,7 @@ class Host(Node):
 
     '''
     This method returns fragmented IP packets given the data.
-    If the data size is MTU, then this fragments data to fit into 
+    If the data size is greater than MTU, then this fragments data to fit into 
     the MTU size.
     '''
     def create_network_packet(self, src_ip, dest_ip, upper_layer_protocol: ipv4.IPv4Packet.UpperLayerProtocol, tpacket):
@@ -189,8 +190,8 @@ class Host(Node):
         dest_mac = self.arp_table.get(dest_ip)
         arp_result = True
         if not dest_mac:
-            is_lan = ipv4.IPv4.is_private_ip(dest_ip)
-            if is_lan:
+            same_subnet = self.on_same_subnetwork(dest_ip)
+            if same_subnet:
                 arp_result = self.make_arp_request(dest_ip)
             else:
                 arp_result = self.make_arp_request(self.default_gateway)
@@ -249,9 +250,9 @@ class Host(Node):
         return True
 
 if __name__ == "__main__":
-    host_a = Host(mac_addr = "fa:ce:de:ad:be:ef", ip_addr = "192.168.1.4")
     switch = Switch(4)
 
+    host_a = Host(mac_addr = "fa:ce:de:ad:be:ef", ip_addr = "192.168.1.4")
     host_a.connect(switch)
     switch.connect_on_port(1, host_a)
 

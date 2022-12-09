@@ -26,6 +26,8 @@ class Switch(Node):
     def send(self, frame: EthernetFrame):
         dest_mac = frame.dest_mac
         port = self.mac_table.get(dest_mac)
+        if not port:
+            return self.flood(frame)
         return self.send_through_port(port, frame)
 
     def send_through_port(self, port_number: int, frame: EthernetFrame):
@@ -35,11 +37,17 @@ class Switch(Node):
         if frame.dest_mac == "ffff:ffff:ffff:ffff": return self.flood(frame)
         else: return self.send(frame)
 
+    '''
+    Use ThreadPoolExecutor to flood frame at the same time to all the ports.
+    '''
+    def __flood_parallel(self, frame: EthernetFrame):
+        pass
+
     def flood(self, frame: EthernetFrame):
-        arp_sender_ip = frame.data.sender_protocol_addr
+        sender_mac = frame.src_mac
         for port in self.ports.values():
             receiver = port.connected_device
             if receiver:
-                if arp_sender_ip != receiver.ip_addr:
+                if sender_mac != receiver.mac_addr:
                     if receiver.receive(frame): return True
         return False

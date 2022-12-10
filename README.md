@@ -1,6 +1,6 @@
 # netsim
 
-````python
+```python
     switch = Switch(4)
 
     host_a = Host(mac_addr = "fa:ce:de:ad:be:ef", ip_addr = "192.168.1.4")

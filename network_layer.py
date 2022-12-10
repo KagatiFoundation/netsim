@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from enum import Enum
-
 from ethernet import *
 from transport_layer import *
 from node import Node

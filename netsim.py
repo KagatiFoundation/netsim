@@ -131,9 +131,9 @@ class Host(Node):
             return False
         return True
 
-    def on_same_subnetwork(src_ip, subnet, dest_ip):
-        src = int(f'0b{ipv4.IPv4.ipv4_to_binary(src_ip)}', 2)
-        sub = int(f'0b{ipv4.IPv4.ipv4_to_binary(subnet)}', 2)
+    def on_same_subnetwork(self, dest_ip):
+        src = int(f'0b{ipv4.IPv4.ipv4_to_binary(self.ip_addr)}', 2)
+        sub = int(f'0b{ipv4.IPv4.ipv4_to_binary(self.subnet_mask)}', 2)
         dest = int(f'0b{ipv4.IPv4.ipv4_to_binary(dest_ip)}', 2)
         my_network = src & sub
         return my_network == (sub & dest)
@@ -217,29 +217,35 @@ class Host(Node):
 
     def receive(self, frame: EthernetFrame):
         if not frame: return False 
-        self.dump_ethernet_frame(frame)
 
         if frame.type == EthernetFrame.ARP:
-            arp = frame.data
+            arp: ARP = frame.data
             src_ip = arp.sender_protocol_addr
             self.arp_table[src_ip] = arp.sender_hardware_addr
+
             if arp.type == ARP.REQUEST:
-                if arp.target_protocol_addr == self.ip_addr:
-                    arpp = ARP(
-                            self.mac_addr, 
-                            self.ip_addr, 
-                            arp.sender_hardware_addr, 
-                            arp.sender_protocol_addr, 
-                            typ=ARP.REPLY
-                        )
-                    fram = EthernetFrame(self.mac_addr, frame.src_mac, arpp, EthernetFrame.ARP)
-                    self.send(fram)
-                else: return False
+                if arp.target_protocol_addr != self.ip_addr:
+                    return False
+                
+                self.dump_ethernet_frame(frame)
+                arpp = ARP(
+                        self.mac_addr, 
+                        self.ip_addr, 
+                        arp.sender_hardware_addr, 
+                        arp.sender_protocol_addr, 
+                        typ=ARP.REPLY
+                    )
+                fram = EthernetFrame(self.mac_addr, frame.src_mac, arpp, EthernetFrame.ARP)
+                self.send(fram)
             elif arp.type == ARP.REPLY:
-                pass
+                if arp.target_protocol_addr == self.ip_addr:
+                    self.dump_ethernet_frame(frame)
             else: return False
         elif frame.type == EthernetFrame.IPV4:
             ippacket: ipv4.IPv4Packet = frame.data
+            if ippacket.dest_ip != self.ip_addr: return False
+
+            self.dump_ethernet_frame(frame)
             if ippacket.upper_layer_protocol == ipv4.IPv4Packet.UpperLayerProtocol.ICMP:
                 icmpp:ICMP = ippacket.data
                 if icmpp.type == ICMP.REQUEST:
@@ -260,4 +266,4 @@ if __name__ == "__main__":
     host_b.connect(switch)
     switch.connect_on_port(2, host_b)
 
-    host_a.send_data("192.168.1.5", 80, ipv4.IPv4Packet.UpperLayerProtocol.UDP, b'\xba' * 1600)
+    host_a.send_data("192.168.1.5", 80, ipv4.IPv4Packet.UpperLayerProtocol.UDP, b'A' * 1600)

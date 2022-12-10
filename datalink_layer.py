@@ -37,12 +37,6 @@ class Switch(Node):
         if frame.dest_mac == "ffff:ffff:ffff:ffff": return self.flood(frame)
         else: return self.send(frame)
 
-    '''
-    Use ThreadPoolExecutor to flood frame at the same time to all the ports.
-    '''
-    def __flood_parallel(self, frame: EthernetFrame):
-        pass
-
     def flood(self, frame: EthernetFrame):
         sender_mac = frame.src_mac
         for port in self.ports.values():

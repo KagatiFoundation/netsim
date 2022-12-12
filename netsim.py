@@ -2,12 +2,12 @@
 
 from ethernet import *
 from transport_layer import *
-from network_layer import *
 from datalink_layer import *
 from node import Node
 from protocols import ipv4
 from protocols.arp import ARP
 from protocols.icmp import ICMP
+import frame_dumper
 
 import pickle
 import random as rand
@@ -26,100 +26,6 @@ class Host(Node):
     def connect(self, device) -> None:
         self.ether_connection = device
         self.ethernet_port.connect(device)
-
-    def dump_ethernet_frame(self, frame: EthernetFrame):
-        print()
-
-        if frame.type == EthernetFrame.ARP:
-            typp = f'ARP ({hex(EthernetFrame.ARP)})'
-        elif frame.type == EthernetFrame.IPV4:
-            typp = f'IPv4 ({hex(EthernetFrame.IPV4)})'
-
-        ETHERNET_FRAME_BORDER_LEN = 100
-        print('+' + ('-' * (ETHERNET_FRAME_BORDER_LEN - 2)) + '+')
-        length = frame.length
-        messages = [
-            f'|        Frame length: {length} bytes ({length * 8} bits)',
-            f'|        Destination: {frame.dest_mac}',
-            f'|        Source: {frame.src_mac}',
-            f'|        Type: {typp}'
-        ]
-
-        frame_start_border_title = '| --- Ethernet frame ---'
-        print(frame_start_border_title+ (ETHERNET_FRAME_BORDER_LEN - len(frame_start_border_title) - 1) * ' ' + '|')
-        for message in messages:
-            print(message + (ETHERNET_FRAME_BORDER_LEN - len(message) - 1) * ' ' + '|')
-
-        if frame.type == EthernetFrame.ARP:
-            self.dump_arp_frame(frame.data)
-        elif frame.type == EthernetFrame.IPV4:
-            self.dump_ipv4_frame(frame.data)
-
-        frame_end_border_title = '| --- End Ethernet frame ---'
-        print(frame_end_border_title + (ETHERNET_FRAME_BORDER_LEN - len(frame_end_border_title) - 1) * ' ' + '|')
-        print('+' + ('-' * (ETHERNET_FRAME_BORDER_LEN - 2)) + '+')
-
-    def dump_arp_frame(self, arp):
-        header = "Request"
-        target_mac = arp.target_hardware_addr if arp.target_hardware_addr else '00:00:00:00:00:00'
-        if arp.type == ARP.REPLY:
-            header = "Reply"
-
-        ARP_FRAME_BORDER_LEN = 80
-        arp_frame = '|        +' + ('-' * (ARP_FRAME_BORDER_LEN - 2)) + '+'
-        arp_frame += ((100 - len(arp_frame) - 1) * ' ') + '|'
-        messages = [
-            f'|        | --- ARP ({header}) ---',
-            f'|        |        Hardware type: Ethernet (1)',
-            f'|        |        Protocol type: IPv4 (0x0800)',
-            f'|        |        Hardware size: 6',
-            f'|        |        Protocol size: 4',
-            f'|        |        Sender MAC address: {arp.sender_hardware_addr}',
-            f'|        |        Sender IP address: {arp.sender_protocol_addr}',
-            f'|        |        Target MAC address: {target_mac}',
-            f'|        |        Target IP address: {arp.target_protocol_addr}',
-            f'|        |        Who has {arp.target_protocol_addr}? Tell {arp.sender_protocol_addr}',
-            f'|        | --- End ARP ---',
-        ]
-
-        print(arp_frame)
-        for message in messages:
-            act_out_msg = message + (ARP_FRAME_BORDER_LEN - len(message) + 8) * ' ' + '|'
-            length = len(act_out_msg)
-            print(act_out_msg, (100 - length - 2) * ' ' + '|')
-        print(arp_frame)
-        
-
-    def dump_ipv4_frame(self, ippacket: ipv4.IPv4Packet):
-        IP_BORDER_LEN = 80
-        ipv4_frame = '|        +' + ('-' * (IP_BORDER_LEN - 2)) + '+'
-        ipv4_frame += ((100 - len(ipv4_frame) - 1) * ' ') + '|'
-        messages = [
-            f'|        | --- IPv4 ---',
-            f'|        |        Source address: {ippacket.src_ip}',
-            f'|        |        Destination address: {ippacket.dest_ip}',
-            f'|        |        Total Length: {ippacket.datagram_length}',
-            f'|        |        Identification: {hex(ippacket.identifier)} ({ippacket.identifier})',
-            f'|        |        Flags: {hex(ippacket.flags)}',
-            f'|        |        ... Reserved bit: Not set',
-            f'|        |        ... Don\'t Fragment: {"Set" if ippacket.flags & 0b10 else "Not set"}',
-            f'|        |        ... More Fragments: {"Set" if ippacket.flags & 0b1 else "Not set"}',
-            f'|        |        Fragment Offset: {hex(ippacket.fragment_offset)}',
-            f'|        |        Time to Live: {ippacket.ttl}',
-            f'|        |        Header Checksum: {hex(ippacket.header_checksum)}',
-            f'|        |        Protocol: {ipv4.IPv4Packet.UpperLayerProtocol(ippacket.upper_layer_protocol).name} ({ippacket.upper_layer_protocol.value})',
-            f'|        | --- End IPv4 ---'
-        ]
-
-        print(ipv4_frame)
-        for message in messages:
-            act_out_msg = message + (IP_BORDER_LEN - len(message) + 8) * ' ' + '|'
-            length = len(act_out_msg)
-            print(act_out_msg, (100 - length - 2) * ' ' + '|')
-        print(ipv4_frame)
-
-    def dump_udp_frame(self, frame):
-        pass
 
     def make_arp_request(self, ip_addr: str) -> str:
         arp = ARP(self.mac_addr, self.ip_addr, None, ip_addr, ARP.REQUEST)
@@ -217,6 +123,10 @@ class Host(Node):
 
     def receive(self, frame: EthernetFrame):
         if not frame: return False 
+        '''
+        if frame.dest_mac != self.mac_addr:
+            return False
+        '''
 
         if frame.type == EthernetFrame.ARP:
             arp: ARP = frame.data
@@ -227,7 +137,7 @@ class Host(Node):
                 if arp.target_protocol_addr != self.ip_addr:
                     return False
                 
-                self.dump_ethernet_frame(frame)
+                frame_dumper.dump_ethernet_frame(frame)
                 arpp = ARP(
                         self.mac_addr, 
                         self.ip_addr, 
@@ -239,13 +149,13 @@ class Host(Node):
                 self.send(fram)
             elif arp.type == ARP.REPLY:
                 if arp.target_protocol_addr == self.ip_addr:
-                    self.dump_ethernet_frame(frame)
+                    frame_dumper.dump_ethernet_frame(frame)
             else: return False
         elif frame.type == EthernetFrame.IPV4:
             ippacket: ipv4.IPv4Packet = frame.data
             if ippacket.dest_ip != self.ip_addr: return False
 
-            self.dump_ethernet_frame(frame)
+            frame_dumper.dump_ethernet_frame(frame)
             if ippacket.upper_layer_protocol == ipv4.IPv4Packet.UpperLayerProtocol.ICMP:
                 icmpp:ICMP = ippacket.data
                 if icmpp.type == ICMP.REQUEST:
@@ -256,14 +166,4 @@ class Host(Node):
         return True
 
 if __name__ == "__main__":
-    switch = Switch(4)
-
-    host_a = Host(mac_addr = "fa:ce:de:ad:be:ef", ip_addr = "192.168.1.4")
-    host_a.connect(switch)
-    switch.connect_on_port(1, host_a)
-
-    host_b = Host(mac_addr = "aa:aa:bb:bb:cc:dd", ip_addr = "192.168.1.5")
-    host_b.connect(switch)
-    switch.connect_on_port(2, host_b)
-
-    host_a.send_data("192.168.1.5", 80, ipv4.IPv4Packet.UpperLayerProtocol.UDP, b'A' * 1600)
+    pass

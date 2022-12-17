@@ -56,7 +56,7 @@ def dump_arp_frame(arp):
         f'|        |        Sender IP address: {arp.sender_protocol_addr}',
         f'|        |        Target MAC address: {target_mac}',
         f'|        |        Target IP address: {arp.target_protocol_addr}',
-        f'|        |        << {data_msg} >>',
+        f'|        |        \033[92m{data_msg}\033[0m',
         f'|        | --- End ARP ---',
     ]
 

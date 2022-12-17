@@ -41,7 +41,6 @@ class Router:
                 interf = entry.get("interface")
                 self.interfaces.get(interf).connected_device.receive(data)
                 return True
-        print("Can't route")
         return False
 
     def receive(self, frame):
@@ -58,7 +57,9 @@ class Router:
         return True
 
     def show_ip_route(self):
-        print("Codes: \tDC - Directly Connected\n\tS - Static\n\tD - Dynamic\n")
+        print(f'+{"-":-^98}+')
+        print(f'|{"*** Routing Table ***":<98}|')
+        print(f"|{'Codes: DC - Directly Connected, S - Static, D - Dynamic':<98}|")
         if not self.routing_table: return
         for entry in self.routing_table:
             typ = entry.get("type")
@@ -68,7 +69,9 @@ class Router:
             dest = entry.get("destination")
             interf = entry.get("interface")
             subbin = ipv4.IPv4.ipv4_to_binary(subnet)
-            print(f'{entry.get("type")}\t{dest}/{subbin.count("1")} {msg}, {interf}')
+            info_msg = f'{entry.get("type")}\t{dest}/{subbin.count("1")} {msg}, {interf}'
+            print(f"|{info_msg:<94}|")
+        print(f'+{"-":-^98}+')
 
 if __name__ == "__main__":
     import netsim
@@ -91,7 +94,7 @@ if __name__ == "__main__":
                         "interface": "FastEthernet"
                     },
                 ],
-    interfaces = {
+        interfaces = {
                 "lan": EthernetPort(),
                 "FastEthernet": EthernetPort()
             })
@@ -114,7 +117,7 @@ if __name__ == "__main__":
                         "interface": "FastEthernet"
                     },
                 ],
-    interfaces = {
+        interfaces = {
                 "lan": EthernetPort(),
                 "FastEthernet": EthernetPort()
             })

@@ -30,6 +30,7 @@ class Host(Node):
     def make_arp_request(self, ip_addr: str) -> str:
         arp = ARP(self.mac_addr, self.ip_addr, None, ip_addr, ARP.REQUEST)
         frame = EthernetFrame(self.mac_addr, "ffff:ffff:ffff:ffff", arp, typ=EthernetFrame.ARP)
+        frame_dumper.dump_ethernet_frame(frame)
         result = self.ethernet_port.connected_device.receive(frame)
         if not result:
             print(f"\n{'ARP request timeout':.^50}")
@@ -78,6 +79,7 @@ class Host(Node):
 
     def send(self, frame: EthernetFrame):
         device = self.ethernet_port.connected_device
+        frame_dumper.dump_ethernet_frame(frame)
         device.receive(frame)
         return True
 

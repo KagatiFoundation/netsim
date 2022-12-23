@@ -189,11 +189,12 @@ class Host(Node):
                         typ=ARP.REPLY
                     )
                 fram = EthernetFrame(self.mac_addr, frame.src_mac, arpp, EthernetFrame.ARP)
-                self.send(fram)
+                return self.send(fram)
             elif arp.type == ARP.REPLY:
                 if arp.target_protocol_addr == self.ip_addr:
                     self.arp_table[src_ip] = arp.sender_hardware_addr
                     frame_dumper.dump_ethernet_frame(frame)
+                return True
             else: return False
         elif frame.type == EthernetFrame.IPV4:
             ippacket: ipv4.IPv4Packet = frame.data

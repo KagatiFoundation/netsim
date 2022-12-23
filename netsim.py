@@ -53,11 +53,13 @@ class Host(Node):
             return TCPPacket(src_port, dest_port, self._tcp_socket.get('ack_num'), seq_num = self._tcp_socket.get('seq_num'), data = data)
         return None
 
-    '''
-    This method returns fragmented IP packets given the data.
-    If the data size is greater than MTU, then this fragments data to fit into 
-    the MTU size.
-    '''
+    # NOTE: Hosts do not engage in fragmentation process. Router 
+    # is the device which does this process.
+
+    # This method returns fragmented IP packets given the data.
+    # If the data size is greater than MTU, then this fragments data to fit into 
+    # the MTU size. 
+    # For more: https://en.wikipedia.org/wiki/IP_fragmentation
     def create_network_packet(self, src_ip, dest_ip, upper_layer_protocol: ipv4.IPv4Packet.UpperLayerProtocol, tpacket):
         raw_bytes = pickle.dumps(tpacket)
         data_length = len(raw_bytes)
@@ -200,20 +202,39 @@ class Host(Node):
             ippacket: ipv4.IPv4Packet = frame.data
             if ippacket.dest_ip != self.ip_addr: return False
 
+            # IPv4's flag field's last bit(LSB) indicates if the upcoming IPv4 packet
+            # contains the fragmented data.
+            # For more: 
+            #       1) https://en.wikipedia.org/wiki/IP_fragmentation
+            #       2) https://en.wikipedia.org/wiki/Internet_Protocol_version_4#Fragmentation_and_reassembly
+            # 
             more_frags = (ippacket.flags & 0x1) == 0x1
             ident = ippacket.identifier
             if more_frags:
+                # We store the fragmented packet in a list. And, store that 
+                # list in a dict with the unique identifier of the IPv4 packet
+                # as a key.
                 pack: typing.List = self.__ip_data_packs.get(ident)
                 if not pack:
                     pack: typing.List = []
                     self.__ip_data_packs[ident] = pack
                 pack.append(ippacket.data)
+                
+                # Returning because we don't want to process fragmented data.
                 return True
+            # If 'more fragments' bit is not set, either this is the packet without 
+            # any other fragmented packets or this is the last packet we receive of 
+            # the fragmented data.
             else:
+                # If the 'fragment offset' is nonzero, a receiver knows that this 
+                # packet is a fragment.
                 if ippacket.fragment_offset != 0x0:
+                    # Append the last fragment in fragments list and reassemble.
                     self.__ip_data_packs.get(ident).append(ippacket.data)
                     assembled_data = self.__assemble_ip_data(identifier = ident, pack_type = ippacket.upper_layer_protocol, frame = frame)
                     ippacket.data = assembled_data
+                # Else, if the 'fragment offset' is zero, a receiver knows that this 
+                # packet is singeleton packet without any other fragments.
                 else:
                     if isinstance(ippacket.data, bytes):
                         ippacket.data = pickle.loads(ippacket.data)
@@ -281,7 +302,7 @@ class Host(Node):
         result = self.__send_ip_pack(sender_ip, ack_reply)
 
         # Connection status is set to 'connected' after SYN ACK response 
-        # is received and ACK reply is sent. 
+        # is received, and ACK reply is sent. 
         if result: self._tcp_socket['status'] = 'connected'
         return result
 

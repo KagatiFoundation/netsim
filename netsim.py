@@ -142,7 +142,8 @@ class Host(Node):
             data = self.create_transport_packet(1000, dest_port, TransportLayerPacket.TCP, data)
         elif packet_type == ipv4.IPv4Packet.UpperLayerProtocol.UDP:
             data = self.create_transport_packet(1000, dest_port, TransportLayerPacket.UDP, data)
-
+        else: return False
+        
         dest_mac = self.arp_table.get(dest_ip)
         arp_result = True
         if not dest_mac:
@@ -160,7 +161,6 @@ class Host(Node):
             None, 
             EthernetFrame.IPV4
         )
-
         if arp_result:
             frame.dest_mac = self.arp_table.get(dest_ip)
             for packet in ether_data:

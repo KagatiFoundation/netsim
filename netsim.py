@@ -119,8 +119,12 @@ class Host(Node):
             # first TCP packet -- SYN packet.
             seq_num = random.randint(0x0, 0xFFFFFFFF)
 
+            # This port number will be used as source port for every TCP
+            # packet transaction for this TCP session
+            src_port = random.randint(0, 65535)
+
             # Vanilla dictionary to maintain TCP session information.
-            self._tcp_socket = {"ack_num": 0, "seq_num": seq_num, "status": "SYN"}
+            self._tcp_socket = {"ack_num": 0, "seq_num": seq_num, "dest_port": dest_port, "src_port": src_port, "status": "SYN"}
 
             # 'net_pack' is SYN packet.
             # Look at the flags argument -- SYN bit is set.
@@ -129,7 +133,7 @@ class Host(Node):
                 self.ip_addr, 
                 dest_ip,
                 ipv4.IPv4Packet.UpperLayerProtocol.TCP, 
-                TCPPacket(random.randint(0, 65535), dest_port, 0, data = b'', off = 0, flags = 0b10)
+                TCPPacket(src_port, dest_port, 0, data = b'', off = 0, flags = 0b10)
             )
             for np in net_pack:
                 frame = EthernetFrame(self.mac_addr, dest_mac, np, EthernetFrame.IPV4)
@@ -145,7 +149,7 @@ class Host(Node):
             if not self.__init_3_way_handshake(dest_ip, dest_port):
                 print("Failed to complete 3 way handshake")
                 return False
-            data = self.create_transport_packet(1000, dest_port, TransportLayerPacket.TCP, data)
+            data = self.create_transport_packet(self._tcp_socket.get("src_port"), dest_port, TransportLayerPacket.TCP, data)
         elif packet_type == ipv4.IPv4Packet.UpperLayerProtocol.UDP:
             data = self.create_transport_packet(1000, dest_port, TransportLayerPacket.UDP, data)
         else: return False

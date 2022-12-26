@@ -13,6 +13,15 @@ class TransportLayerPacket:
 
 
 class TCPPacket(TransportLayerPacket):
+    FIN = 0b1
+    SYN = 0b10
+    RST = 0b100
+    PSH = 0b1000
+    ACK = 0b10000
+    URG = 0b100000
+    ECE = 0b1000000
+    CWR = 0b10000000
+
     def __init__(self, src_port: int, dest_port: int, ack_num: int, seq_num: int = random.randint(0x00, 0xFFFFFFFF), data: bytes = b'', off: int = 0b000000000, flags: int = 0, window = 0, checksum = 0, urgent_p = 0, options = ''):
         super().__init__(src_port, dest_port, data)
         self.seq_num = seq_num # 32 bits

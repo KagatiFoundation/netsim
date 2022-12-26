@@ -22,7 +22,7 @@ class Host(Node):
         self.default_gateway = "192.168.1.254"
         self.subnet_mask = "255.255.255.0"
         self.ethernet_port = EthernetPort()
-        self.mtu = 1500 # Maximum Transmission Unit
+        self.mtu = 2000 # Maximum Transmission Unit
         self.__ip_data_packs = dict()
 
     def connect(self, device) -> None:
@@ -71,13 +71,17 @@ class Host(Node):
             # Return 'tpacket' object with IP data by fragmenting into multiple
             # packets.
             buffer_pointer = 0
-            frag_off = 1
+            
+            # 'fragment offset' value of first IP fragment is 0.
+            frag_off = 0
             while True:
-                yield ipv4.IPv4Packet(src_ip, dest_ip, upper_layer_protocol, raw_bytes[buffer_pointer:buffer_pointer + self.mtu], identifier=identifier, flags=0b001, offset = frag_off)
+                ippack = ipv4.IPv4Packet(src_ip, dest_ip, upper_layer_protocol, raw_bytes[buffer_pointer:buffer_pointer + self.mtu], identifier=identifier, flags=0b001, offset = frag_off)
+                # fragment offset = (MTU - IHL) / 8
+                frag_off += (self.mtu - 20) >> 3 # 20 -> IP header length without options
+                yield ippack
                 buffer_pointer += self.mtu
                 left_data = raw_bytes[buffer_pointer:]
                 if len(left_data) > self.mtu:
-                    frag_off += 1
                     continue
                 else:
                     yield ipv4.IPv4Packet(src_ip, dest_ip, upper_layer_protocol, left_data, identifier=identifier, offset = frag_off)
@@ -287,7 +291,7 @@ class Host(Node):
 
         # Replying with SYN ACK packet.
         # Last one is flags argument. SYN and ACK bits are set.
-        syn_ack_reply = TCPPacket(1000, syn_pack.src_port, self._tcp_socket.get("ack_num"), seq_num, b'', 1, 0b000010010)
+        syn_ack_reply = TCPPacket(syn_pack.dest_port, syn_pack.src_port, self._tcp_socket.get("ack_num"), seq_num, b'', 1, 0b000010010)
         return self.__send_ip_pack(sender_ip, syn_ack_reply)
 
     def __handle_tcp_syn_ack_pack(self, syn_ack_pack: TCPPacket, sender_ip: str):
@@ -298,7 +302,7 @@ class Host(Node):
 
         # Replying with ACK packet.
         # Last one is flags argument. ACK bit is set.
-        ack_reply = TCPPacket(1000, syn_ack_pack.src_port, self._tcp_socket.get("ack_num"), self._tcp_socket.get("seq_num"), b'', 2, 0b10000)
+        ack_reply = TCPPacket(syn_ack_pack.dest_port, syn_ack_pack.src_port, self._tcp_socket.get("ack_num"), self._tcp_socket.get("seq_num"), b'', 2, 0b10000)
         result = self.__send_ip_pack(sender_ip, ack_reply)
 
         # Connection status is set to 'connected' after SYN ACK response 
@@ -329,6 +333,6 @@ if __name__ == "__main__":
     sw.connect_on_port(1, host1)
     sw.connect_on_port(2, host2)
     sw.connect_on_port(3, host3)
-    host1.send_data("192.168.1.2", 100, ipv4.IPv4Packet.UpperLayerProtocol.TCP, b'A' * 1600)
+    host1.send_data("192.168.1.2", 443, ipv4.IPv4Packet.UpperLayerProtocol.TCP, b'ANKU' * 1000)
 
     # TODO: Maintain port numbers in TCP session

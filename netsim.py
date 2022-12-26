@@ -292,6 +292,8 @@ class Host(Node):
         seq_num = random.randint(0x00, 0xFFFFFFFF)
         self._tcp_socket['seq_num'] = seq_num
         self._tcp_socket['ack_num'] = syn_pack.seq_num + 1
+        self._tcp_socket['src_port'] = syn_pack.dest_port
+        self._tcp_socket['dest_port'] = syn_pack.src_port
 
         # Replying with SYN ACK packet.
         # Last one is flags argument. SYN and ACK bits are set.

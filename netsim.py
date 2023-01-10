@@ -333,12 +333,14 @@ if __name__ == "__main__":
     host2 = Host("192.168.1.2", "aa:bb:aa:bb:aa:cc")
     host3 = Host("192.168.1.3", "aa:bb:aa:bb:aa:ff")
     sw = Switch(4)
+    sw.create_vlan(2, "students")
+    sw.access_vlan(3, 2)
     host1.connect(sw)
     host2.connect(sw)
     host3.connect(sw)
     sw.connect_on_port(1, host1)
     sw.connect_on_port(2, host2)
     sw.connect_on_port(3, host3)
-    host1.send_data("192.168.1.2", 443, ipv4.IPv4Packet.UpperLayerProtocol.TCP, b'ANKU' * 1000)
+    host1.send_data("192.168.1.4", 443, ipv4.IPv4Packet.UpperLayerProtocol.TCP, b'ANKU' * 1000)
 
     # TODO: Maintain port numbers in TCP session

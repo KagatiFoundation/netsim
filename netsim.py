@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 from ethernet import *
-from transport_layer import *
 from datalink_layer import *
 from node import Node
 from protocols import ipv4
 from protocols.arp import ARP
 from protocols.icmp import ICMP
+from protocols.tcp import TCP
+from protocols.udp import UDP
 import frame_dumper
 
 import pickle
@@ -48,9 +49,9 @@ class Host(Node):
 
     def create_transport_packet(self, src_port: int, dest_port: int, protocol, data: bytes):
         if protocol == TransportLayerPacket.UDP:
-            return UDPPacket(src_port, dest_port, data)
+            return UDP(src_port, dest_port, data)
         elif protocol == TransportLayerPacket.TCP:
-            return TCPPacket(src_port, dest_port, self._tcp_socket.get('ack_num'), seq_num = self._tcp_socket.get('seq_num'), data = data)
+            return TCP(src_port, dest_port, self._tcp_socket.get('ack_num'), seq_num = self._tcp_socket.get('seq_num'), data = data)
         return None
 
     # NOTE: Hosts do not engage in fragmentation process. Router 
@@ -133,7 +134,7 @@ class Host(Node):
                 self.ip_addr, 
                 dest_ip,
                 ipv4.IPv4Packet.UpperLayerProtocol.TCP, 
-                TCPPacket(src_port, dest_port, 0, data = b'', off = 0, flags = 0b10)
+                TCP(src_port, dest_port, 0, data = b'', off = 0, flags = 0b10)
             )
             for np in net_pack:
                 frame = EthernetFrame(self.mac_addr, dest_mac, np, EthernetFrame.IPV4)
@@ -255,7 +256,7 @@ class Host(Node):
                     fram = EthernetFrame(self.mac_addr, frame.src_mac, net_pack, EthernetFrame.IPV4)
                     return self.send(fram)
             elif ippacket.upper_layer_protocol == ipv4.IPv4Packet.UpperLayerProtocol.TCP:
-                tcp: TCPPacket = ippacket.data
+                tcp: TCP = ippacket.data
                 _syn_bit = (tcp.flags >> 0x1) & 0x1
                 _ack_bit = (tcp.flags >> 0x4) & 0x1
                 if _syn_bit == 0x1:
@@ -288,7 +289,7 @@ class Host(Node):
             if not self.send(frame): return False
         return True
 
-    def __handle_tcp_syn_pack(self, syn_pack: TCPPacket, sender_ip: str):
+    def __handle_tcp_syn_pack(self, syn_pack: TCP, sender_ip: str):
         seq_num = random.randint(0x00, 0xFFFFFFFF)
         self._tcp_socket['seq_num'] = seq_num
         self._tcp_socket['ack_num'] = syn_pack.seq_num + 1
@@ -297,10 +298,10 @@ class Host(Node):
 
         # Replying with SYN ACK packet.
         # Last one is flags argument. SYN and ACK bits are set.
-        syn_ack_reply = TCPPacket(syn_pack.dest_port, syn_pack.src_port, self._tcp_socket.get("ack_num"), seq_num, b'', 1, 0b000010010)
+        syn_ack_reply = TCP(syn_pack.dest_port, syn_pack.src_port, self._tcp_socket.get("ack_num"), seq_num, b'', 1, 0b000010010)
         return self.__send_ip_pack(sender_ip, syn_ack_reply)
 
-    def __handle_tcp_syn_ack_pack(self, syn_ack_pack: TCPPacket, sender_ip: str):
+    def __handle_tcp_syn_ack_pack(self, syn_ack_pack: TCP, sender_ip: str):
         ack_num = syn_ack_pack.seq_num + 1
         seq_num = self._tcp_socket.get('seq_num') + 1
         self._tcp_socket['seq_num'] = seq_num
@@ -308,7 +309,7 @@ class Host(Node):
 
         # Replying with ACK packet.
         # Last one is flags argument. ACK bit is set.
-        ack_reply = TCPPacket(syn_ack_pack.dest_port, syn_ack_pack.src_port, self._tcp_socket.get("ack_num"), self._tcp_socket.get("seq_num"), b'', 2, 0b10000)
+        ack_reply = TCP(syn_ack_pack.dest_port, syn_ack_pack.src_port, self._tcp_socket.get("ack_num"), self._tcp_socket.get("seq_num"), b'', 2, 0b10000)
         result = self.__send_ip_pack(sender_ip, ack_reply)
 
         # Connection status is set to 'connected' after SYN ACK response 

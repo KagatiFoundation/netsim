@@ -2,7 +2,10 @@
 
 from ethernet import *
 from node import Node
+
 import sys
+import threading
+import time
 
 class Switch(Node):
     def __init__(self, port_count: int = 4):
@@ -11,6 +14,13 @@ class Switch(Node):
         self.hosts = dict()
         self.ports = {port_number + 1: EthernetPort() for port_number in range(port_count)}
         self.vlans = {1: VLAN(1, ports = self.ports.copy())}
+        self.__mac_table_manager_thread = threading.Thread(target = self.__manage_mac_table)
+        self.__mac_table_manager_thread.start()
+
+    def __manage_mac_table(self):
+        while True:
+            time.sleep(2)
+            self.mac_table.clear()
 
     def connect(self, node = None) -> None:
         print("Use method 'connect_on_port': this method is not supported")

@@ -1,7 +1,6 @@
 from ethernet import EthernetFrame
 from protocols.arp import ARP
-from protocols import ipv4
-import transport_layer
+from protocols import ipv4, udp, tcp
 
 def dump_ethernet_frame(frame: EthernetFrame):
     print()
@@ -122,7 +121,7 @@ def dump_ipv4_frame(ippacket: ipv4.IPv4Packet):
     print(ipv4_frame)
 
 
-def dump_tcp_frame(frame: transport_layer.TCPPacket):
+def dump_tcp_frame(frame: tcp.TCP):
     PARENT_FRAME_LEN = 100
     SUPER_PARENT_FRAME_LEN = 120
     TCP_BORDER_LEN = 80

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 from enum import Enum
-from transport_layer import TransportLayerPacket
+from protocols.udp import UDP
+from protocols.tcp import TCP
 
 class IPv4:
     @staticmethod
@@ -62,7 +63,7 @@ class IPv4Packet:
         TCP = 6
         UDP = 17
 
-    def __init__(self, src_ip, dest_ip, upper_layer_protocol, data: TransportLayerPacket, identifier: int = 0x0, offset: int = 0x0, flags: int = 0x0, options = None):
+    def __init__(self, src_ip, dest_ip, upper_layer_protocol, data, identifier: int = 0x0, offset: int = 0x0, flags: int = 0x0, options = None):
         self.src_ip = src_ip
         self.dest_ip = dest_ip
         self.data = data

@@ -48,9 +48,9 @@ class Host(Node):
         return my_network == (sub & dest)
 
     def create_transport_packet(self, src_port: int, dest_port: int, protocol, data: bytes):
-        if protocol == TransportLayerPacket.UDP:
+        if protocol == ipv4.IPv4Packet.UpperLayerProtocol.UDP:
             return UDP(src_port, dest_port, data)
-        elif protocol == TransportLayerPacket.TCP:
+        elif protocol == ipv4.IPv4Packet.UpperLayerProtocol.TCP:
             return TCP(src_port, dest_port, self._tcp_socket.get('ack_num'), seq_num = self._tcp_socket.get('seq_num'), data = data)
         return None
 
@@ -150,9 +150,9 @@ class Host(Node):
             if not self.__init_3_way_handshake(dest_ip, dest_port):
                 print("Failed to complete 3 way handshake")
                 return False
-            data = self.create_transport_packet(self._tcp_socket.get("src_port"), dest_port, TransportLayerPacket.TCP, data)
+            data = self.create_transport_packet(self._tcp_socket.get("src_port"), dest_port, ipv4.IPv4Packet.UpperLayerProtocol.TCP, data)
         elif packet_type == ipv4.IPv4Packet.UpperLayerProtocol.UDP:
-            data = self.create_transport_packet(1000, dest_port, TransportLayerPacket.UDP, data)
+            data = self.create_transport_packet(1000, dest_port, ipv4.IPv4Packet.UpperLayerProtocol.UDP, data)
         else: return False
         
         dest_mac = self.arp_table.get(dest_ip)
@@ -332,16 +332,16 @@ class Host(Node):
 if __name__ == "__main__":
     host1 = Host("192.168.1.1", "aa:bb:aa:bb:aa:bb")
     host2 = Host("192.168.1.2", "aa:bb:aa:bb:aa:cc")
-    host3 = Host("192.168.1.3", "aa:bb:aa:bb:aa:ff")
+    # host3 = Host("192.168.1.3", "aa:bb:aa:bb:aa:ff")
     sw = Switch(4)
-    sw.create_vlan(2, "students")
-    sw.access_vlan(3, 2)
+    # sw.create_vlan(2, "students")
+    # sw.access_vlan(3, 2)
     host1.connect(sw)
     host2.connect(sw)
-    host3.connect(sw)
+    # host3.connect(sw)
     sw.connect_on_port(1, host1)
     sw.connect_on_port(2, host2)
-    sw.connect_on_port(3, host3)
-    host1.send_data("192.168.1.4", 443, ipv4.IPv4Packet.UpperLayerProtocol.TCP, b'ANKU' * 1000)
+    # sw.connect_on_port(3, host3)
+    host1.send_data("192.168.1.2", 443, ipv4.IPv4Packet.UpperLayerProtocol.TCP, b'ANKU' * 1000)
 
     # TODO: Maintain port numbers in TCP session
